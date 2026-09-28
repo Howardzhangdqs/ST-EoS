@@ -1,0 +1,151 @@
+% !TEX program = xelatex
+% 编译方式：xelatex main.tex（连编 2-3 次以解析目录与交叉引用）
+% 本文档是论文 "Sharpness Proxies are Predictors, Not Local Actuators" 的中文深度解读，
+% 读者设定为已读完 tutorial/（EoS 入门教程）。
+% 章节文件：ch00_preface ... ch11_conclusion，每章一个文件。
+
+\documentclass[11pt,a4paper]{ctexart}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+% 图片路径：项目 figures/ 目录 + 本目录
+\graphicspath{{../../figures/}{./}}
+
+% 放宽浮动体参数，减少大面积留白
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+
+\geometry{left=2.5cm,right=2.5cm,top=3cm,bottom=2.5cm}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=teal!60!black,
+  urlcolor=blue!60!black,
+  pdftitle={尖锐度代理是预测器，而非执行器——论文深度解读},
+  pdfauthor={ST-EoS 项目}
+}
+
+\crefname{figure}{图}{图}
+\crefname{table}{表}{表}
+\crefname{section}{章}{章}
+\crefname{equation}{式}{式}
+\Crefname{figure}{图}{图}
+\Crefname{table}{表}{表}
+\Crefname{section}{章}{章}
+
+% ---------- 宏定义（与论文记号一致；\ensuremath 使其文本/数学模式通用） ----------
+\newcommand{\lmax}{\ensuremath{\lambda_{\max}}}
+\newcommand{\lhatg}{\ensuremath{\hat{\lambda}_{\mathbf{g}}}}
+\newcommand{\lhatd}{\ensuremath{\hat{\lambda}_{\Delta\theta}}}
+\newcommand{\vtope}{\ensuremath{v_{\mathrm{top}}}}
+
+% ---------- 自定义环境 ----------
+% 章节文件统一使用 \begin{keybox}{标题} ... \end{keybox}
+\newtcolorbox{keybox}[1]{
+  colback=blue!5!white, colframe=blue!60!black,
+  fonttitle=\bfseries, title=#1,
+  boxrule=0.8pt, arc=3pt, left=8pt, right=8pt, top=4pt, bottom=4pt
+}
+\newtcolorbox{notebox}[1][]{
+  colback=yellow!10!white, colframe=orange!60!black,
+  fonttitle=\bfseries, title=方法学注记,
+  boxrule=0.8pt, arc=3pt, left=8pt, right=8pt, top=4pt, bottom=4pt, #1
+}
+
+% ---------- 定理类环境（ch09 转述论文命题结构用） ----------
+\newtheorem{claim}{论断}
+\newtheorem{proposition}{命题}
+\newtheorem{corollary}{推论}
+\theoremstyle{definition}
+\newtheorem{assumption}{假设}
+\theoremstyle{remark}
+\newtheorem{remark}{注}
+\newtheorem{observation}{观察}
+
+% ---------- 页眉页脚 ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 尖锐度代理是预测器，而非执行器——论文解读}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- 标题信息 ----------
+\title{\textbf{\Huge 尖锐度代理是预测器，而非执行器\\[0.4em]
+\Large 稳定边界支持监测，不支持局部曲率控制\\[0.8em]
+\normalsize ——论文 \textit{Sharpness Proxies are Predictors, Not Local Actuators} 深度解读}}
+\author{ST-EoS 项目中文解读}
+\date{2026 年 8 月}
+
+% ============================================================
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+本文件是对研究论文 \textit{Sharpness Proxies are Predictors, Not Local Actuators:
+The Edge of Stability Supports Monitoring, Not Local Curvature Control}
+（中文可译作《尖锐度代理是预测器，而非执行器：稳定边界支持监测，而非局部曲率控制》）
+的逐章深度解读。\textbf{读者默认已读完 \texttt{tutorial/} 目录下的《稳定边界（EoS）入门教程》}：
+我们不再解释 $\lmax$、$2/\eta$ 阈值、渐进尖锐化（progressive
+sharpening）、周期-2 振荡（period-2 oscillation）、自稳定化
+（self-stabilization）、轨迹低维性（low-dimensionality）等入门概念
+（全部术语的英文原名与一句话解释见第 0 章``前言''的``术语与记号约定''），
+而是直接进入这篇论文的增量贡献。\textbf{除深度学习与该教程之外，本解读
+不假定任何专业背景}：论文借用的控制理论（执行器、受控对象）、数值线性
+代数（瑞利商、幂迭代、ARPACK）、数理统计（置信区间判读、统计功效、去趋势相关）
+与动力系统（不动点、奇异摄动）行话，集中在第 0 章``前言''的``背景速查''
+一节按领域解释，并在正文首次出现处附一句括号速释。论文检验了 EoS
+研究线中一个反复出现的承诺——
+``如果尖锐度可以廉价地测量，它就应该可以廉价地操纵''——并发现这个承诺一分为二：
+\textbf{预测端成立}（单次海森-向量积的梯度瑞利商在 EoS 体制下近乎精确地追踪 $\lmax$），
+\textbf{控制端结构性失败}（任何秩-1/代理驱动的单方向干预都无法把 $\lmax$ 压到
+EoS 均衡之下——要么原地钉住、要么向上逃逸——唯有 SAM 式全局动作能够下行）。
+本解读按论文的章节顺序展开，讲解每个实验的设计逻辑、每个数字的含义、
+理论命题的直觉，以及这份研究作为方法论示范的自我纠错过程。
+
+\vspace{0.8em}
+\noindent\textbf{前置要求：}已读完 EoS 入门教程（\texttt{tutorial/eos\_tutorial.pdf}）。\\[0.3em]
+\noindent\textbf{专业背景：}深度学习常规知识即可；深度学习之外的专业术语
+（控制论、数值线性代数、统计、动力系统）见第 0 章``背景速查''与正文随文速释。
+
+\vspace{0.5em}
+\noindent\textbf{文中所有插图均来自论文原图（项目 \texttt{figures/} 目录的实验数据）。}
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% 前言编为第 0 章，使 ch01--ch11 的节号与正文手工引用（``第九章''等）一致
+\setcounter{section}{-1}
+
+\input{ch00_preface}
+\input{ch01_overview}
+\input{ch02_related}
+\input{ch03_setup}
+\input{ch04_predictors}
+\input{ch05_control}
+\input{ch06_xsam}
+\input{ch07_alternatives}
+\input{ch08_scale}
+\input{ch09_theory}
+\input{ch10_discussion}
+\input{ch11_conclusion}
+
+\end{document}

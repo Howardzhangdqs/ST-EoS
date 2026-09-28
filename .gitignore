@@ -1,0 +1,94 @@
+# ============================================================================
+# ST-EoS .gitignore
+# 入库范围 = 代码（steos/ scripts/ tests/）、论文（paper/）、精选图
+# （figures/ paper_figures_png/）、配置（configs/）、 vendored 参考
+# （third_party/）、根文档（README/FINDINGS/REVISION2_STATUS/TODO）。
+# 一切可再生产物、大文件、内部过程文档一律本地保留。
+# ============================================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Virtual environments ---
+.venv/
+venv/
+
+# --- Secrets / credentials（绝不入库） ---
+.env
+.env.*
+*.key
+*.pem
+
+# --- 实验产物与模型权重（runs/ 是本地档案，可再生产物不入库） ---
+/runs/
+*.npz
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+wandb/
+
+# --- 数据集与大数据盘挂载 ---
+/data/
+bigdisk
+
+# --- 本地专属文档与状态（内部审稿过程、哨兵、备份、派生输出） ---
+AGENTS.md
+/docs/reviews/
+.state/
+/backups/
+/analysis_out/
+/artifacts/
+.slim/
+
+# --- LaTeX 构建产物（.tex / .bib / .pdf 保留入库） ---
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.synctex(busy)
+*.xdv
+*.fls
+*.fdb_latexmk
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+
+# --- 图片草稿快照（figures/ 与 paper_figures_png/ 的定稿保持跟踪） ---
+figures/_prev_*
+figures/_preview_*
+figures/etad_round12_backup/
+figures/etad_round13_log.txt
+figures/unused/
+
+# --- third_party 为有意 vendored 的参考代码，保持跟踪 ---
+!third_party/
+
+# --- OS / 编辑器杂物 ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+*.orig
+*.rej
+.vscode/
+.idea/

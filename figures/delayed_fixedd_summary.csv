@@ -1,0 +1,19 @@
+level,seed,arm,d,T_gate,diverged,survivors,late_lmax,etalam2
+seed,0,rankk_k1 (adaptive),,200.0,False,1.0,268.65409721297914,6.716352430324479
+seed,0,delayed_d2.5,2.5,200.0,True,,,
+seed,0,delayed_d3,3.0,200.0,True,,,
+seed,1,rankk_k1 (adaptive),,194.0,False,1.0,260.4853605618063,6.5121340140451585
+seed,1,delayed_d2.5,2.5,194.0,True,,,
+seed,1,delayed_d3,3.0,194.0,True,,,
+seed,2,rankk_k1 (adaptive),,188.0,False,1.0,242.793239732503,6.069830993312575
+seed,2,delayed_d2.5,2.5,188.0,True,,,
+seed,2,delayed_d3,3.0,188.0,True,,,
+seed,3,rankk_k1 (adaptive),,195.0,False,1.0,262.1224582969649,6.553061457424123
+seed,3,delayed_d2.5,2.5,195.0,True,,,
+seed,3,delayed_d3,3.0,195.0,True,,,
+seed,4,rankk_k1 (adaptive),,206.0,False,1.0,257.08979595013096,6.427244898753274
+seed,4,delayed_d2.5,2.5,206.0,True,,,
+seed,4,delayed_d3,3.0,206.0,True,,,
+agg,-1,rankk_k1 (adaptive),,196.6,False,5.0,258.22899035087687,6.455724758771922
+agg,-1,delayed_d2.5,2.5,196.6,True,0.0,,
+agg,-1,delayed_d3,3.0,196.6,True,0.0,,

@@ -1,0 +1,307 @@
+% !TEX encoding = UTF-8 Unicode
+% ch03：实验设置与测量方法学（中文深度解读片段）
+\section{实验设置与测量方法学}
+\label{sec:ch03}
+
+\begin{keybox}{先抓住本章的五件事}
+\begin{itemize}
+  \item 四类架构刻意覆盖 plain / BatchNorm / LayerNorm 三个归一化族（plain $=$ 不带归一化层——与 ResNet 文献里``无残差连接''的 plain network 无关）与从 MLP 到 11.2M 参数 ResNet-18 的规模谱：机制在干净体制里做，结论在规模上验。
+  \item \textbf{阈值是体制依赖的}：$2/\eta$ 只是全批 GD 极限；重球动量下线性稳定性边界是 $2(1{+}\mu)/\eta$（ResNet-18 是 38 而非 20）；mini-batch 下饱和在 $2/\eta$ 的是\emph{批}尖锐度，全批 $\lmax$ 被压到其下。
+  \item 曲率测量三层验证：幂迭代 + Pearlmutter HVP + 热启动；MLP 路径与 ARPACK 交叉验证到相对一致 $\le3\times10^{-7}$；ResNet 规模同一估计器\textbf{伪收敛}，头条数字改用确定性 ARPACK。
+  \item 统计规范：所有头条数字为 mean$\pm$95\% CI（Student-$t$，$n=5$ 种子），相关用滚动均值（window 5）去趋势后的 Pearson。
+  \item 确定性 CUDA 协议不是洁癖：非确定性会给两个\emph{完全相同}的 run 造成约 6 单位的伪 $\lmax$ 差距。全部计算约 45 GPU 小时，单张 RTX 5080。
+\end{itemize}
+\end{keybox}
+
+\noindent 本章对应论文第 3 节（Setup）与附录
+A（超参数与计算成本）。在多数论文里，“实验设置”是读者快速略过的部分；在这篇论文里恰恰相反——\textbf{测量方法学本身是贡献的一半}。原因很简单：论文的全部命题都是关于
+$\lmax$ 的定量陈述（它是否跟踪 $2/\eta$、是否被压下、是否不变），如果尺子本身有 $\pm
+45\%$
+的系统性偏差（这不是假设，是论文实测过的教训），那么一切置信区间都失去意义。本章先讲实验对象（架构）、再讲“阈值”一词的精确含义、然后是尺子（曲率测量）、统计规范、确定性协议，最后转述附录
+A 的成本账单。
+
+\subsection{四类实验架构}
+\label{sec:ch03-arch}
+
+\begin{table}[!ht]
+\centering\small
+\caption{论文的四类实验架构（论文第 3
+节）。注意四个家族分别承担不同角色：机制、控制、归一化族泛化、规模复现。}
+\label{tab:ch03-arch}
+\begin{tabular}{lp{0.52\linewidth}}
+\toprule
+家族 & 配置与角色 \\
+\midrule
+(i) tanh MLP & $[20\!-\!256\!-\!256\!-\!1]$，teacher--student 回归（teacher--student regression，教师网络生成数据、学生网络拟合的合成任务），\textbf{全批 GD}。机制实验主场：自稳定帽理论在此精确成立。 \\
+(ii) PreAct-ResNet (BN) & CIFAR-10，plant / 控制臂；完整 torchvision ResNet-18（$11.2$M）用于 X-SAM 消融。mini-batch SGD（$\mu{=}0.9$）。 \\
+(iii) ViT-tiny / ConvNeXt-atto & \texttt{timm}，LayerNorm，CIFAR-10。预测端代理在第三种归一化族上的泛化检验。 \\
+(iv) 标准 ResNet-18 & torchvision 版（$11.2$M 参数，CIFAR 适配：$3{\times}3$ stride-1 stem、无 maxpool），CIFAR-100，mini-batch SGD（$\mu{=}0.9$，wd $5{\times}10^{-4}$，bs $128$，$5000$ 步）。at-scale（规模版：真实 CNN 而非玩具 MLP）控制实验。 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{术语提醒。}下表及后文常用\textbf{臂}（arm）指“并行实验中的一个
+分组/变体”（临床试验行话）——“四臂对比”即同一设置下同时跑四种配置。
+注意本文的“控制臂”指\emph{开启干预}的实验组（“控制”取“施加控制”
+义），对照组是 SGD 基线臂——这与临床试验里“控制组 = 对照组”的惯用义
+恰好相反。\textbf{plant}是控制论行话“受控对象/装置”的英文原词，本文
+转指“直接改写梯度、介入训练动力学”的那类优化器干预（完整对照见第
+\ref{sec:ch00-glossary} 节背景速查 A 组）。
+
+\textbf{术语补充：teacher--student 回归。}家族 (i) 的任务形式值得先说清
+：固定一个随机初始化的\emph{教师}网络（本文 $[128,128]$），用它把输入
+向量映射成标签、再注入标准差 $0.3$ 的高斯噪声，然后训练\emph{学生}网络
+去拟合这些标签。这是 EoS 文献的标准合成测试床，好处有三：数据生成真值
+完全已知（第~\ref{sec:ch10}~章用噪声方差 $0.3^{2}=0.09$ 作为测试 MSE
+的贝叶斯最优地板，用的正是这一点）；任务难度可以用噪声幅度精确调节
+（后文扫描实验的“难度”轴即此旋钮）；没有数据集工程负担，算力可以全部
+花在机制与测量上。
+
+这份清单值得从“实验设计”的角度读一遍。它不是“尽可能多跑几个模型”的堆料，而是一条精心排布的推理链：\textbf{MLP}
+提供 EoS
+最干净的体制（全批、确定性、秒级成本、理论逐字适用），所有机制主张先在这里立住；\textbf{PreAct-ResNet(BN)}
+引入第一个真实世界的复杂度——BatchNorm 与 mini-batch
+噪声——检验控制端主张在“理论不再逐字精确”的体制下是否依然站得住；\textbf{ViT /
+ConvNeXt（LN）}
+（ViT 与 ConvNeXt 分别是 Transformer 与现代化 CNN 的代表架构，均以
+LayerNorm 为归一化层；模型取自 \texttt{timm}，常用的 PyTorch 图像
+模型库）
+则专门服务于预测端：代理量的可靠性是归一化族函数，必须三族齐备才能画出完整地图；最后的\textbf{标准
+ResNet-18 / CIFAR-100} 是论文摘要里“split 在 ResNet-18/CIFAR-100
+规模复现”的舞台。与教程相比（教程的实验几乎全部在 tanh MLP
+上），读者应注意到论文把赌注从“现象存在”移到了“现象的可用性”——可用性问题必须在真实架构上回答。
+
+\subsection{阈值的体制依赖：一个读者易错点}
+\label{sec:ch03-threshold}
+
+教程反复强调的 $2/\eta$ 是\textbf{全批 GD
+的定律}。论文在这里补上了教程刻意略去的三个体制修正，这也是全文数字能否读对的关键：
+
+\begin{enumerate}
+  \item \textbf{全批 GD}：$\lmax \to 2/\eta$。论文在此体制内把 $2/\eta$
+视为精确，机制陈述（自稳定帽、周期-2 振荡持帽）“按字面”成立。
+  \item \textbf{重球动量（heavy-ball，$\mu$；动量法的学名，意象是有质量的球滚过损失面、惯性使它冲过窄谷——就是 PyTorch 的 momentum）}：线性稳定性边界变为
+  $2(1{+}\mu)/\eta$（线性稳定性分析 = 在均衡点附近把更新规则做一阶泰勒展开、要求扰动不被逐步放大的标准方法——对二次损失上的梯度下降，它给出“$\eta\lambda>2$ 就振荡发散”这条线；惯性 $\mu$ 越大越容易振荡，所以这条线被抬高）。对 ResNet-18 实验（lr $0.1$，$\mu{=}0.9$），阈值是
+  \textbf{38，而不是 $2/\eta{=}20$}。若错用 20 去读 ResNet 的 $\lmax$
+  曲线，会把平衡位置（即均衡轨道驻留的尖锐度水平，下同）错判近一倍——例如一条晚期 $\lmax\!\approx\!31$ 的 SGD 轨迹，在 38
+的标尺下“在阈值之下”（符合 mini-batch 压低效应），在 20
+的标尺下则会被误读为“远超阈值”。
+  \item \textbf{mini-batch SGD}：相关的量是\textbf{批尖锐度}，它稳定在
+$2/\eta$，并把全批 $\lmax$ 压到\emph{严格其下}（Andreyev 等 2024，动量情形见
+Andreyev 等 2026）。
+\end{enumerate}
+
+论文为此立了一条贯穿全文的行文约定：“the EoS
+equilibrium”一律指\textbf{当下体制的实际阈值（operative threshold）}——即均衡轨道驻留的尖锐度\emph{水平}（轨道本身是什么，见第~\ref{sec:ch00-glossary}~节 D 组与第九章；行文用阈值数值指代它）——GD 实验里是
+$2/\eta$，ResNet-18 实验里是重球边界
+$2(1{+}\mu)/\eta$。这个约定看似只是措辞问题，实则与论文的核心主张同构：连“阈值是多少”都随体制而变，那么“阈值能否被局部压低”的机制当然也可能随体制而变——这正是论文贡献列表第四条（机制随体制而变、非可压性不变）的伏笔。读者在后面所有章节看到任何
+$\lmax$ 数字时，都应先问一句：这是哪个体制的阈值标尺？
+
+\subsection{曲率测量：从幂迭代到确定性 ARPACK}
+\label{sec:ch03-curvature}
+
+教程已经讲过幂迭代与 Pearlmutter
+海森--向量积（HVP：$Hv=\nabla(\mathbf{g}\!\cdot\!v)$，双重反传——Pearlmutter
+技巧即 1994 年提出的“对反传结果再反传一次”实现，等价于 PyTorch
+里开 \texttt{create\_graph} 的双重反传；因为海森有参数量平方个元素、
+根本存不下，这种“只算 $Hv$、不存 $H$”的隐式做法是全部曲率测量的
+基本单位）。论文的测量栈在其上加了两层保障：
+
+\textbf{热启动。} 幂迭代跨测量调用热启动（以上一时刻的特征向量为初始种子，采自
+Ramasinghe 等 2026，见解读第 \ref{sec:ch02-exact} 节），把每步成本压到中位 4--11 次
+HVP。
+
+\textbf{ARPACK 交叉验证。}（此处“交叉验证”指两把尺子对账核对，与机器学习
+的训练/验证集划分无关。）在全批 MLP 路径上，该估计器在 \textbf{12 个终点
+checkpoint} 与 ARPACK（经典的迭代特征值求解库，scipy 的
+\texttt{eigsh} 即其接口；基于 Lanczos 类算法，只需“矩阵 $\times$
+向量”而不需显式存储矩阵——正好适配只能做 HVP 的神经网络海森，
+本文视为精确基准）对账：相对一致（两种估计器读数之差除以真值，
+即相对误差）$\le3\times10^{-7}$，归一化 Ritz 残差（Ritz residual，
+把近似特征对 $(\hat\lambda,\hat v)$ 代回定义式后剩下的偏差
+$\|H\hat v-\hat\lambda\hat v\|$ 除以尺度归一——检验“这对猜测像不像
+真特征值/特征向量”的误差指标）
+$\le2.3\times10^{-6}$。这组数字的意义是把“估计器偏差”压缩到远小于现象本身的位置：头条的
+$2/\eta$ 跟踪比值经 ARPACK 校正为 $0.9993\pm0.0027$（最大单 run 偏差
+$0.46\%$），残余的 $0.2$--$0.5\%$ 展宽与 $\lmax(t)$ 围绕 $2/\eta$
+的瞬时振荡（采样相位不同）相一致——即残差来自\emph{现象}而非\emph{尺子}。
+
+\textbf{伪收敛与换尺。} 在 ResNet-18
+规模，同一条热启动幂迭代链\textbf{伪收敛}（false
+convergence）：迭代看似收敛、实际锁在错误的值上——提前停在了\emph{次主导瑞利商}（subdominant，第二大特征值对应的量）上，就像做
+PCA 时漏掉第一主成分、只抓到第二主成分。论文对此的处置是：at-scale
+的全部头条数字改用\textbf{确定性 ARPACK}（``确定性''修饰评估批与
+CUDA 协议、非算法本身；ARPACK 虽是迭代法，但 Lanczos 子空间法分得清
+前几名特征值、又带 Ritz 残差自检，tol 压到 $10^{-6}$ 后自身误差远小于
+要测的现象——故可当真值尺子，见第~\ref{sec:ch00-glossary}~节
+ARPACK 条。如三向实验：$k{=}3$，tol $10^{-6}$，每 100
+步一次，512 样本确定性 eval batch）。伪收敛有多严重？论文在 X-SAM
+一节实测：mini-batch 幂迭代在该交叉熵海森上\textbf{平均低估 $+45\%$}（“低估
+$+45\%$”指估计值比真值低约四成五）。单 HVP 代理 $\lhatg$、$\lhatd$ 与对齐
+$|\cos(\cdot,\vtope)|$ 也在同一确定性 eval batch、模型 eval 模式（BN/LN
+确定性）下计算——保证代理与真值在完全相同的条件下比较。
+
+这一小节的方法学教训值得单独强调：\textbf{便宜的估计器必须与贵的真值对账之后才有资格当尺子}，而对账通过不代表换一个体制还能通过——MLP
+上无偏的同一估计器在 ResNet
+上伪收敛。这直接影响了论文的叙事结构（哪些数字来自哪把尺子），也是解读第
+\ref{sec:ch03-lesson} 节的主题。
+
+\subsection{统计规范}
+\label{sec:ch03-stats}
+
+所有头条数字均为 \textbf{mean$\pm$95\% CI}（置信区间：对\emph{均值}的不确定
+度——同样的实验若重复很多次，每次这样算出的区间约有 95\% 会罩住真实的
+平均值；它比标准差窄得多，因为它问的是“均值有多准”而非“单次运行波动
+多大”），种子数 $n{=}5$（覆盖预测端测量、秩-1
+plant 动作 C3、两个范数帽控制 C1 W-cap 与 C2 $\gamma$-cap；X-SAM 消融为
+$n{=}10$）。“$\pm$”的精确定义：基于逐种子均值的 Student-$t$ 双侧 95\%
+置信区间（$t_{0.975,n-1}\,s/\sqrt{n}$；$s$ 是种子值的样本标准差，
+$s/\sqrt{n}$ 是均值的标准误，$t_{0.975,4}\approx2.78$ 是小样本下代替
+正态系数 1.96 的查表系数——Student-$t$ 就是为“连波动本身都得靠估”的
+小样本设计的修正分布；\textbf{双侧}指两端各留 2.5\%、同时提防偏高偏低
+两种错判）。在 $n{=}5$ 下 $t$ 系数约
+$2.78$，比正态近似\textbf{保守}（区间更宽，不易把纯噪声误报成真差异）
+得多——这是小样本下诚实的选择。
+
+\textbf{正文的判读规则。}后文所有结论都压在三种 CI 读法上，在此一次说清：
+\begin{itemize}
+  \item \textbf{CI 跨零}：对相关系数或差值而言，0 代表“没有效应”；区间
+        罩住 0 就意味着无法排除“其实毫无关系”——此时某个种子算出的
+        $+0.55$ 只是运气；
+  \item \textbf{CI 不重叠}：两组区间完全错开时，“两组真实均值相同”很难
+        成立，差异可以当结论（一种偏严格的差异判据）。特例是
+        \textbf{上/下置信界}的比较：CI 的右/左端点分别代表“真实值最乐观
+        /最悲观到哪”，“A 的上界仍低于 B 的下界”= A 最好情形仍比 B
+        最差情形低，是比均值比较更强的分离证据；
+  \item \textbf{“在 CI 内”}：某差值与 0 的距离没有超出噪声能解释的范围
+        （差值的置信区间罩住 0），只能说“检测不到这个效应”，不能说
+        “效应为零”。另有一种常见的变体说法“X 在 Y 的 CI 内”——指
+        X 的点估计落在 Y 的区间里——同样读作“检测不到差异”。
+\end{itemize}
+图中的\textbf{误差棒}（或阴影带）画的就是 95\% CI——读图时按误差棒是否
+错开下结论，而不是按均值点谁高谁低。
+
+相关性一律用\textbf{去趋势 Pearson}（detrended，先剔除共同趋势再做相关）。
+把两个组件分开讲。\textbf{Pearson 相关系数}度量两条等长序列的线性同步
+程度：
+\begin{equation}
+  r \;=\; \frac{\sum_{i}\,(x_i-\bar{x})\,(y_i-\bar{y})}
+  {\sqrt{\textstyle\sum_{i}(x_i-\bar{x})^{2}}\;
+   \sqrt{\textstyle\sum_{i}(y_i-\bar{y})^{2}}},
+  \label{eq:ch03-pearson}
+\end{equation}
+即把两条序列各自去均值后当作向量、取夹角余弦——分子是（去均值后的）
+协方差，分母是两个标准差的乘积，因此 $r$ 无量纲、可跨序列比较。取值
+$[-1,1]$：$+1$ 完全同涨同跌、$0$ 涨落无线性关系、$-1$ 完全反向。
+\textbf{去趋势}是算相关前的预处理：对每条序列取\textbf{滚动均值}
+（rolling mean，window 5：第 $t$ 个点的“趋势值”取为它邻近 5 个采样点
+的平均——一条紧跟慢变化的平滑曲线），再定义\textbf{残差}
+$\tilde{x}_t=x_t-\mathrm{roll}_{5}(x)_t$（原始值减去滚动均值后剩下的
+上下涨落部分——时间序列意义下的“残差”，与残差网络无关），最后对
+\emph{残差}序列做式~\eqref{eq:ch03-pearson}。
+
+为什么必须先去趋势？这是时间序列相关的经典陷阱：两条\emph{都在单调
+爬升}的曲线，即使逐时刻的涨落彼此独立，原始 Pearson 也会接近 $+1$
+——去均值只减掉\emph{全局}平均，减不掉\emph{逐段抬升的趋势}：几乎
+每个时刻两条曲线都各自处在均值之上（或之下），乘积
+$(x_i-\bar x)(y_i-\bar y)$ 恒正，相关系数自然虚高。袖珍反例：
+$x_t=t+$ 白噪声、$y_t=2t+$ 另一份\emph{独立}白噪声，原始相关
+$\approx+1$、去趋势后 $\approx0$。而 EoS 训练恰好全是这种局面：代理量
+与 $\lmax$ \emph{都}在单调漂移（教程讲过的渐进尖锐化意味着 $\lmax$
+整体爬升；权重范数也随之增长），不去趋势的相关会把“共同趋势”记成
+“跟踪能力”。去趋势之后，相关系数度量的是“去掉共同趋势后，两者的
+\emph{涨落}是否同步”，这才是“代理能否跟踪 $\lmax$”的正确问法。解读第
+\ref{sec:ch04-tier0} 节会展示不去趋势 / 稀疏采样会让这个数字摆动多大
+——那里的“采样相位”指每隔 $N$ 步才测一次时，采样点恰好落在振荡的
+波峰还是波谷，它会显著改变读数。
+
+\subsection{确定性 CUDA 协议}
+\label{sec:ch03-determinism}
+
+所有带 CI 的 ResNet-18 比较都在确定性 CUDA 协议下运行：\texttt{cudnn.deterministic}
+加
+\texttt{CUBLAS\_WORKSPACE\_CONFIG=:4096:8}。这不是工程洁癖，而是被实测数字逼出来的必要条件：默认的
+conv-backward 是非确定性的，\textbf{两个完全相同的 SAM
+run}（同种子、同数据）会分叉到终态参数相差约 $10^{-1}$，并由此产生\textbf{约 6
+单位的伪 $\lmax$ 差距}；确定性模式消除这一差距。
+
+把“6 单位”放进后文的语境里就能体会其分量：X-SAM 消融要分辨的效应量（faithful X-SAM
+相对 SAM 的晚期 $\lmax$ 差）是
+$+0.62\pm1.23$——点估计只约为伪差距（$6$ 单位）的十分之一、CI 半宽
+约为其五分之一。没有确定性协议，任何此类的细微效应都淹没在
+CUDA 非确定性里，既可能造假阳性也可能掩盖真效应。
+
+\subsection{超参数与计算成本（附录 A 转述）}
+\label{sec:ch03-hyper}
+
+\begin{table}[!ht]
+\centering\small
+\caption{论文附录 A 的主实验族超参数与单 run 成本（自 run
+manifests——每次实验运行自动落盘的配置与用时记录文件——读取；表中
+X-SAM 系列、真-$\lmax$ plant 等术语的含义在相应章节展开：X-SAM 与
+faithful/clamped 见第六章，clamp-free 桥与真-$\lmax$ plant（修正版
+秩-1 plant）见第七、八章）。所有
+ResNet-18 臂共享 $\mu{=}0.9$、wd $5{\times}10^{-4}$、bs $128$、$5000$ 步、lr
+$0.1$，及确定性 CUDA + ARPACK 测量协议。}
+\label{tab:ch03-hyper}
+\begin{tabular}{lp{0.5\linewidth}c}
+\toprule
+实验族 & 关键配置 & 单 run 成本 \\
+\midrule
+MLP 主实验 & $n{=}1024$，dim $20$，难度（噪声 std）$0.3$，teacher $[128,128]$，student $[256,256]$ tanh，全批 GD，lr $0.05$（$2/\eta{=}40$），$3000$ 步，5 种子 & $\sim$11 s \\
+MLP 扫描 & 基本同主实验，$4000$ 步；每 50 步测尖锐度（热启动幂迭代，150 iters，tol $10^{-4}$；$\lmax$ 与 $\lambda_c$），每 10 步 snapshot；网格：lr $0.01$--$0.2$（$20\times$）、难度 $0.1$--$1.2$（$12\times$）、宽度 $32$--$256$（$8\times$） & $\sim$17 s \\
+ResNet-18 三向 & SGD / rank-1 plant / SAM，$n{=}5$；$\lmax$ 用 ARPACK（$k{=}3$，tol $10^{-6}$），确定性 512 样本 eval batch，每 100 步 & 15--31 min \\
+X-SAM 消融 & SGD / SAM（$\rho{=}0.05$）/ faithful X-SAM（$\rho{=}0.05$，$\alpha{=}0.2$，sign-gated，无 clamp）/ clamped 变体（钳位门控 $d{=}\max(\hat\lambda/(2/\eta),1)$），$n{=}10$；ARPACK（$k{=}1$，tol $10^{-6}$，每 20 步；每 100 步留 $k{=}3$ 备份） & 29--75 min \\
+无 clamp 桥接 & rank-1 无 clamp（“桥接臂”=专门补齐两个实验设置之间缺口的对照臂；编辑因子——对梯度沿 $\hat v$ 分量的改写强度系数，记 $f$，见第七章——截到 $[-1,1)$，每步触发），$n{=}5$；晚期窗口在确定性 512 样本 eval batch 上测 $\lhatg$ & 10--45 min \\
+真-$\lmax$ plant & rank-1 以 ARPACK 感知（$k{=}2$，tol $10^{-2}$，每 $N{=}20$ 步，batch 512），无 clamp 下限，$n{=}5$ & 51--63 min \\
+长训练验证 & 三向（sgd/rank1/sam）重跑，$12000$ 步，pad/crop + flip 增广，确定性 + ARPACK，$n{=}2$ & 35--73 min \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+计算成本方面（论文附录 A 的原文口径）：全部实验在\textbf{单张 RTX 5080（16
+GB）}上完成。MLP 族每 run 秒级（主实验约 11 s、扫描约 17
+s），扫网格总计分钟到小时级；预算由 ResNet-18 族主导——确定性 ARPACK 三向（15
+runs）约 5.2 小时、CIFAR-10 X-SAM 族（40 runs）约 33 小时、修正后的真-$\lmax$
+plant（5 runs）约 4.6 小时、无 clamp 桥接臂约 1.9 小时——\textbf{合计约 45 GPU
+小时}（论文自述为来自 run manifests 的诚实量级估计，单 run 时间随 GPU
+共享程度浮动）。
+
+从可复现性的
+角度读这组数字：这篇论文的全部证据可以在一张消费级显卡上一周内复现。对一篇以负结果为核心主张的论文，这一点并非装饰——负结果最怕“你没调够”的质疑，而低到人人可跑的成本，正是把“复现并反驳”的门槛降到最低的方式。
+
+\subsection{为什么测量方法学本身是一大贡献}
+\label{sec:ch03-lesson}
+
+最后把本章的线索收拢成一个论点：这篇论文的测量方法学不是附属章节，而是与“预测器 /
+执行器二分”并列的贡献。支撑这个论断的是项目日志里编号 29 与 31 的两次教训（论文第
+3、5 节是其书面化）：\textbf{发现 29} 揭示 ResNet 路径早期报告的
+$\lmax\!\approx\!19$
+实为幂迭代伪收敛伪迹——被低估的不是细节而是头条数字；\textbf{发现 31} 用确定性 ARPACK
+以 $n{=}5$ 重测三向实验，头条结论在 ground-truth
+协议下得到确认，但绝对值整体下移（项目日志记录约 7--8
+单位），且排序与分离度不变。这就是说：\textbf{换一把正确的尺子，结论没变，但所有数字都变了}——这正说明任何试图在这类问题上做定量断言的工作，都必须先回答“你的尺子准吗、在哪个体制下准”。
+
+更微妙的一层：伪收敛还会\textbf{伪装成实验结论}。论文摘要里提到 mini-batch
+体制下“诊断并修复了一个会伪装成收敛的感知伪迹”——一个系统性低估 $\lmax$
+的估计器会让控制实验看起来“成功压低了尖锐度”，而实际上什么都没发生。尺子的偏差方向一旦与实验希望的方向一致，坏测量就会源源不断地制造假阳性。这是本文把测量协议（热启动
++ ARPACK 对账 + 确定性
+CUDA）写成显式章节的深层原因，也是解读后文读控制端实验时应始终保持的警觉。
+
+\subsection*{本章要点}
+\begin{itemize}
+  \item 四类架构是有角色的推理链：MLP（全批 GD，机制精确）$\to$
+PreAct-ResNet(BN)（控制臂）$\to$ ViT / ConvNeXt(LN)（代理的归一化族泛化）$\to$ 标准
+ResNet-18/CIFAR-100（规模复现）。
+  \item 阈值是体制的函数：$2/\eta$（全批 GD）$\ne 2(1{+}\mu)/\eta{=}38$（ResNet-18
+重球）$\ne$ 批尖锐度框架（mini-batch）；全文“the EoS
+equilibrium”指当下体制的实际阈值。
+  \item 尺子三层验证：热启动幂迭代（中位 4--11 HVPs/步）在 MLP 上与 ARPACK 对账至
+$\le3\times10^{-7}$ 相对一致；同一估计器在 ResNet-18 上伪收敛（实测平均低估约
+$45\%$），at-scale 头条全部改用确定性 ARPACK。
+  \item 统计上：mean$\pm$95\% CI（Student-$t$，$n{=}5$；X-SAM 为
+$n{=}10$）；相关一律用 window-5 滚动均值去趋势后的 Pearson，以剔除共同漂移的假相关。
+  \item 确定性 CUDA 协议（\texttt{cudnn.deterministic} +
+\texttt{CUBLAS\_WORKSPACE\_CONFIG=:4096:8}）消除同种子 run 间约 6 单位的伪 $\lmax$
+差距；全部计算约 45 GPU 小时、单张 RTX 5080。
+\end{itemize}

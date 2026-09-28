@@ -1,0 +1,21 @@
+arch,proxy,detrend_r
+ViT-tiny (LayerNorm),‖g‖ (grad),0.5270045423072283
+ViT-tiny (LayerNorm),‖LN γ‖,0.4437047477215279
+ViT-tiny (LayerNorm),norm_ln_gamma_block_mean,0.4434445770154484
+ViT-tiny (LayerNorm),‖mlp W‖ (fc1+fc2),0.4422391885515676
+ViT-tiny (LayerNorm),‖attn W‖ (qkv+proj),0.440038515140635
+ViT-tiny (LayerNorm),‖conv W‖,0.42825615162085123
+ViT-tiny (LayerNorm),‖Δθ‖ (update),0.35171310570514763
+ViT-tiny (LayerNorm),‖head W‖,0.31209012885968057
+ViT-tiny (LayerNorm),std_block(‖γ_block‖),0.10229326417958756
+ViT-tiny (LayerNorm),maxmin_block(‖γ_block‖),0.09775187449947513
+ViT-tiny (LayerNorm),‖LN β‖,0.0828627797469937
+ConvNeXt-atto (LayerNorm),‖g‖ (grad),0.5231888633831305
+ConvNeXt-atto (LayerNorm),‖Δθ‖ (update),0.4564756540061431
+ConvNeXt-atto (LayerNorm),‖LN γ‖,0.3190884097058238
+ConvNeXt-atto (LayerNorm),norm_ln_gamma_block_mean,0.3187068165882143
+ConvNeXt-atto (LayerNorm),std_block(‖γ_block‖),0.31870668906413974
+ConvNeXt-atto (LayerNorm),maxmin_block(‖γ_block‖),0.31870660612247054
+ConvNeXt-atto (LayerNorm),‖conv W‖,0.31747292283206247
+ConvNeXt-atto (LayerNorm),‖head W‖,0.3109922409276524
+ConvNeXt-atto (LayerNorm),‖LN β‖,0.1483803505129015

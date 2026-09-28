@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "st-eos"
+version = "0.0.1"
+description = "Sharpness / curvature and weight-trajectory co-analysis centered on the Edge of Stability phenomenon"
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.0",
+  "torchvision>=0.15",
+  "timm>=0.9",
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "scikit-learn>=1.2",
+  "matplotlib>=3.6",
+  "pandas>=1.5",
+  "pyyaml>=6.0",
+  "tqdm>=4.60",
+]
+
+[project.optional-dependencies]
+umap = ["umap-learn>=0.5", "pynndescent>=0.5"]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["steos*"]

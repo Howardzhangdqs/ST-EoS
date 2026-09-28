@@ -1,0 +1,458 @@
+% ============================================================
+% ch09：理论解读：自稳定帽（对应论文理论附录 self_stabilization_cap.tex）
+% 读者已读 tutorial/（含 Damian 定性图像）；本章升级为 2-D 递推定量图像。
+% ============================================================
+
+\section{理论解读：自稳定帽}\label{sec:ch09}
+
+\begin{keybox}{本章速览}
+\begin{itemize}
+  \item Damian 二维递推的周期-2 不动点 $|x|{\to}\delta=\sqrt{2\alpha/\beta}$
+        把 $S=\lmax$ 钉在 $2/\eta$：\emph{帽就是振荡本身}——教程第 7 节
+        定性故事的定量骨架。
+  \item 秩-1 阻尼后的均衡超出量 $y^{*}=2\gamma/((1-\gamma)\eta)>0$ 且随
+        $\gamma$ 单调升：阻尼搬走的是帽的高度（向上），不是振荡的振幅
+        $|x^{*}|=\sqrt{2\alpha/\beta}$。
+  \item 命题（转述自论文 Proposition 1）：翻号周期-2 轨道\emph{没有}
+        $y^{*}\le0$ 的；条件 $y$-收缩乘子 $\mu_y=1-\kappa$
+        （$\kappa=2(1-\gamma)\eta^2\alpha$），$|\mu_y|<1\iff
+        (1-\gamma)\eta^2\alpha<1$。
+  \item 两条推论划边界：SAM 的曲率放大型全局动作把边界压到
+        $\lambda^{*}_{\mathrm{SAM}}<2/\eta$（下逃逸）；缩放型单方向动作
+        只能上移边界（上逃逸）或留帽。缺口 G1--G5 在案：这是二维约化
+        定理，不是轨迹定理。
+\end{itemize}
+\end{keybox}
+
+\begin{notebox}[title={动力系统小词典：本章的专用词汇（第 0 章背景速查 D 组的精简版）}]
+\begin{itemize}
+  \item \textbf{不动点}：迭代一步后原地不动的状态（类比 loss 收敛到的
+        驻点）。\textbf{周期-2 轨道}：两个点轮流切换、每两步一循环的
+        迭代序列——学习率偏大时 loss 在两个值之间来回跳即此物。记号
+        $F^{2}$ 表示把更新规则 $F$ \emph{复合执行两步}（不是平方），
+        于是“周期-2 轨道”就是 $F^{2}$ 的不动点；
+  \item \textbf{均衡 / 稳态}：训练动力学的长期驻留模式。本章的均衡
+        \emph{不是静止点}，而正是那条周期-2 振荡轨道；“$\lmax$ 钉在
+        $2/\eta$”即曲线长期停在阈值附近来回振荡；
+  \item \textbf{翻号}：迭代每步改变符号（$x\to-x$）；\textbf{ansatz /
+        试解}：先猜解的形状（如“每步变号、幅度不变”）代回方程验证；
+  \item \textbf{线性稳定性分析 / Jacobian}：在均衡附近把更新规则做
+        一阶泰勒展开，得一阶导数矩阵（Jacobian，小扰动每步被如何
+        放大/旋转的局部线性近似）；其特征值的模 $>1$ 表示扰动被放大
+        （不稳定）、$<1$ 表示被吸住（收缩）；
+  \item \textbf{乘子}：给周期轨道一个小扰动，绕轨道一整圈后扰动被乘
+        的系数；$|\mu|<1$ 即该方向扰动每圈缩小。\textbf{排斥子}：附近
+        轨道被推离的状态（吸引子的反面）——轨道“是排斥子”不妨碍
+        实验观察到它：真实轨迹可在排斥轨道\emph{附近}贴着走；
+  \item \textbf{慢--快结构}：系统里同时有每步剧变的快变量与每步只挪
+        一点的慢变量；奇异摄动即“近似认为快变量瞬时到达均衡、把耦合
+        问题拆成两个一维问题”的标准方法。\textbf{快流形}：慢变量
+        冻结时快变量走出的轨道；\textbf{役使}：快变量被慢变量锁死、
+        只能瞬时跟随；\textbf{不变图}：迭代进入后不再离开的点集
+        （这里是 $x\in\{\pm x^{*}\}$ 两点循环）。
+\end{itemize}
+\end{notebox}
+
+\textbf{本章在论文中的位置。}论文把控制端的负结果陈述为“机制猜想”
+（Claim 1，非正式），完整理论化在附录 \texttt{self\_stabilization\_cap.tex}：
+启发式（阻尼后的二维递推）、形式化命题（带稳定性分析）、两条推论、一个
+观察与缺口清单 G1--G5。本章按同样顺序转述，重心放在\emph{每个公式的
+直觉}：这个阻尼的\emph{定量}形式是什么？用执行器去碰它会发生什么？
+这个理论\emph{不}主张什么？
+
+\subsection{从定性故事到定量骨架：Damian 二维递推}\label{sec:ch09-damian}
+
+教程第 7 节讲过：$\lmax$ 越过 $2/\eta$ 后，GD 沿顶部特征向量（教程记
+$\vtope$，本章按论文记 $u_1$）做周期-2 振荡，三阶泰勒项的阻尼
+把 $\lmax$ 拉回来。Damian 等人 (2023) 把它写成二维递推，支点是恒等式
+\begin{equation}
+  \nabla S \;=\; \nabla^{3}L(u_1,u_1),
+  \label{eq:ch09-identity}
+\end{equation}
+其中 $S(\theta)=\lmax(H)$：\emph{尖锐度的梯度就是三阶张量在顶部方向上取
+两次的收缩}。直觉：沿 $u_1$ 移动 $x$，曲率以
+$\nabla^{3}L(u_1,u_1)\cdot x$ 的速率变化——振荡不仅“移动参数”，还直接
+“改写谱”。状态变量：$x_t$ 是迭代点沿 $u_1$ 的位移；$y_t=S-2/\eta$ 是
+相对阈值的\emph{超出量}；$\alpha=-\nabla L\cdot\nabla S>0$ 是\emph{渐进
+尖锐化系数}（每单位移动供给多少尖锐度）；$\beta=\|\nabla S\|^2$。于是
+\begin{equation}
+  x_{t+1}=-(1+\eta y_t)\,x_t,
+  \qquad
+  y_{t+1}=y_t+\eta\!\left(\alpha-\tfrac{\beta}{2}x_t^{2}\right).
+  \label{eq:ch09-damian}
+\end{equation}
+\textbf{逐项直觉。}$x$-方程是沿顶部方向的线性化 GD：系数 $-(1+\eta y)$
+在 $y>0$（不稳定区）模大于 $1$，每步\emph{翻号并放大}（sign-flip，每步改变符号的振荡）——周期-2 振荡的
+生成器。$y$-方程是慢漂移：每步加 $\eta\alpha$ 的尖锐化供给，减去
+$\tfrac{\beta}{2}x^2$ 的\emph{三次恢复力}——“三次”指它源自泰勒展开的
+三阶项（曲率对位置的变化率，由恒等式
+\eqref{eq:ch09-identity} 给出），对 $y$ 的增量恰是位移的\emph{二次}式：
+大幅振荡直接改变曲率，振幅越大、恢复力越强。
+令放大停止（$y\to0$）且 $y$-增量归零，得周期-2 不动点：
+\begin{equation}
+  |x|\;\to\;\delta=\sqrt{2\alpha/\beta},
+  \qquad
+  y\to0\;(S\approx2/\eta).
+  \label{eq:ch09-fixedpoint}
+\end{equation}
+直觉读法：$\alpha$ 是“每步打进来的尖锐度预算”，$\tfrac{\beta}{2}x^2$
+是“振荡用振幅换来的曲率回撤”，预算平衡决定振幅。$2/\eta$ 不是外部强加
+的约束，而是这个自洽解（自洽 = 解的取值反过来支撑解自身成立）的值——
+\emph{帽（cap）就是振荡本身}。这也是后文“均衡”一词的确切所指：不是
+静止点，而是这条振幅 $\delta$、尖锐度 $\approx2/\eta$ 的周期-2 驻留
+轨道。伏笔由此埋
+下：想移除帽就必须移除振荡；想保留振荡，帽就在。
+
+\subsection{论断（转述自论文 Claim 1）：秩-1 阻尼的两种命运}\label{sec:ch09-claim}
+
+\begin{claim}[秩-1 阻尼无法下逃逸；非正式，转述自论文 Claim 1]
+秩-1 执行器干预（plant action，直接改写梯度）把梯度沿 $u_1$ 的估计
+$\hat v$ 方向的分量阻尼掉。它有两种命运，都不下逃逸：
+\begin{itemize}
+  \item \emph{不完美阻尼}（$\hat v$ 滞后于 $u_1$，如自由的
+        $\hat v=\Delta\theta_{t-1}/\|\cdot\|$）：平行梯度分量的抵消不
+        完全，周期-2 振荡持续，自稳定帽保持，$\lmax$ 钉在 $2/\eta$。
+  \item \emph{精确阻尼}（$\hat v\approx u_1$，如幂迭代）：抵消趋于精确
+        （$\eta_{\mathrm{eff}}\lambda_1\to2$），周期-2 振荡被
+        \emph{解除武装}，帽被移除，渐进尖锐化无阻进行——$\lmax$ 长过
+        $2/\eta$（上逃逸），而不是低于它。
+\end{itemize}
+只有\emph{全局}执行器干预（SAM，其扰动作用于每个方向）能下逃逸。
+\end{claim}
+
+实证锚点（论文控制实验，实证侧见第~\ref{sec:ch08}~章）：自由 $\hat v$
+锁定 $40.12\pm0.12=2/\eta$；精确 $\hat v$（$k=1$）上逃逸到
+$261.8\pm5.4$ 且 $k=1,2,5,10$ 逐位相同（一维尖锐谱
+$\lambda_2\approx0.6$）；多尖锐景观上每方向独立上逃逸（${\sim}65$）；
+SAM 逃到 $21.35\pm0.04<2/\eta=40$，而忠实 X-SAM 消融（$n=10$）里其
+秩-1 修正每步开火、晚期效应量上界仅 $+1.85$。
+
+\subsection{阻尼后的 $x$-递推：帽被搬到哪里？}\label{sec:ch09-damped}
+
+执行器把梯度改写为
+\begin{equation}
+  g' = g-\gamma\,(g^{\!\top}\hat v)\,\hat v,
+  \qquad
+  \gamma=1-\tfrac{1}{d}\in(0,1),
+  \qquad
+  d=\max\!\bigl(\hat\lambda/(2/\eta),\,1\bigr),
+  \label{eq:ch09-edit}
+\end{equation}
+即把 $\hat v$ 方向的梯度分量乘以 $1/d$（除数由感知尖锐度的超阈值倍数
+自门控）。取 $\hat v\approx u_1$、窗口内 $d$ 固定，位移递推变为
+\begin{equation}
+  x_{t+1}=\bigl(1-(1-\gamma)\eta\lambda_1\bigr)x_t
+         =\bigl(-1+2\gamma-(1-\gamma)\eta y_t\bigr)x_t,
+  \label{eq:ch09-damped-x}
+\end{equation}
+$y$-递推保持 \eqref{eq:ch09-damian} 的形式（第二个等号用了
+$\eta\lambda_1=2+\eta y$：$\gamma=0$ 时回到 Damian 映射——单参数形变，
+即同一递推拧“阻尼强度 $\gamma$”一个旋钮得到的连续变形版本）。
+代入周期-2 试解（$x_{t+1}=-x_t$，翻号 ansatz）：
+\begin{equation}
+  y^{*}=\frac{2\gamma}{(1-\gamma)\eta}\;>\;0,
+  \qquad
+  |x_*|=\sqrt{2\alpha/\beta},
+  \label{eq:ch09-ystar}
+\end{equation}
+后者由 $y$-方程在轨道上增量为零给出。三条读法：\textbf{符号}，
+$y^{*}>0$——精确阻尼把均衡移到阈值\emph{上方}，与控制目标相反。直觉：
+阻尼调低翻号放大器的增益（gain，放大倍数——即每步把信号乘多大的那个
+系数），而 $y=0$ 处增益恰为 $-1$（等幅翻号）；要恢复
+等幅翻号，必须让 $y$ 升高、用更大的“本征不稳定”补回被除掉的放大。
+\textbf{单调性}，$\partial y^{*}/\partial\gamma=2/((1-\gamma)^2\eta)>0$
+——阻尼越强，均衡尖锐度越高。\textbf{振幅不变}，$|x_*|=\sqrt{2\alpha/\beta}$
+与无阻尼时逐字相同——$y$-方程的预算平衡不含 $\gamma$；阻尼改变“帽的
+高度”，不改“振荡的幅度”，帽被搬走了，但搬\emph{向上}。
+
+\subsection{启发式预测什么、不预测什么}\label{sec:ch09-heuristic}
+
+论文对 \eqref{eq:ch09-ystar} 的定位非常克制。\textbf{它预测的：}符号
+（向上）与参数依赖——均衡 $S^{*}=2/\eta+y^{*}=2d/\eta$；已被精确
+$\vtope$ 实验确认（一维尖锐景观上逃逸 $261.8\pm5.4$，多尖锐
+景观 ${\sim}65$）。\textbf{它不预测的：}逃逸\emph{量级}——自门控
+$d=\hat\lambda/(2/\eta)$、$\gamma=1-1/d$ 下，把 $d$ 代回
+\eqref{eq:ch09-ystar}，条件化为恒等式 $y^{*}=y$，\emph{任何}
+$\lambda_1>2/\eta$ 都满足不动点条件；至于上方多远，由无阻碍渐进尖锐化
+在哪里平衡决定（四次及更高阶景观项的事）——$261.8$ 不是理论预测值，
+是景观的属性。\textbf{它不涵盖的：}自由滞后 $\hat v$ 根本\emph{不进入}
+该推导——$\hat v\not\approx u_1$ 时 $\hat\lambda$ 读次主导轴、自门控
+$d$ 被错误曲率设定，而 \eqref{eq:ch09-damped-x} 瞄准的 $u_1$-振荡基本
+未被触碰，帽保持。Claim 1 的两种体制由此统一为“推导前提是否成立”：
+精确 $\hat v$ 进入 $y^{*}>0$ 体制；滞后 $\hat v$ 从未真正作用到 $u_1$
+轴上。
+
+\subsection{命题（转述自论文 Proposition 1）：翻号周期-2 轨道不低于阈值}\label{sec:ch09-prop}
+
+设 $F$ 为 \eqref{eq:ch09-damped-x} 与 \eqref{eq:ch09-damian} 之 $y$-方程
+定义的二维映射。三个假设：
+
+\begin{assumption}[A1：非退化顶部对，转述]
+$(\lambda_1,u_1)$ 沿轨迹简单且孤立（“简单”即该特征值没有并列——只
+对应一个特征方向；“孤立”即与第二名拉开 $\lambda_1-\lambda_2\ge\Delta>0$
+的距离，否则“谁是最尖方向”不唯一），$\lambda_1-\lambda_2\ge\Delta>0$，
+故 $\nabla S$ 良定义（良定义 = 无歧义地存在：$\lmax$ 无并列时 $S$
+才是参数的光滑函数、梯度才存在，Damian 等人 2023 的引理 2 需要 $\lmax$ 简单）。
+\end{assumption}
+
+\begin{assumption}[A2：窗口固定阻尼，转述]
+$\gamma\in(0,1)$ 在分析窗口内常数（它在 $O(1/\eta)$ 步上演化；
+$x$-动力学是 $O(1)$ 的——慢-快尺度分离）。
+\end{assumption}
+
+\begin{assumption}[A3：精确感知，转述]
+$\hat v=u_1$（理想化；任何感知误差只会减弱阻尼）。
+\end{assumption}
+
+\begin{proposition}[秩-1 阻尼无法下逃逸；转述自论文 Proposition 1]
+在 A1--A3 下，对 $\alpha,\beta,\eta>0$、$\gamma\in(0,1)$：
+\begin{itemize}
+  \item[(a)] \emph{代数部分。}$F$ 的每个\emph{翻号}周期-2 不动点——
+        $F(x_*,y_*)=(-x_*,y_*)$、$|x_*|>0$，即每步把位移翻号、走两步
+        恰好回到原处的两步循环——都满足
+        $y^{*}=2\gamma/((1-\gamma)\eta)>0$ 且
+        $|x_*|=\sqrt{2\alpha/\beta}$；\emph{不存在} $y^{*}\le0$ 的翻号
+        周期-2 轨道。（$F^2$（复合执行两步的映射）在 $\kappa>4$ 时还容许\emph{非翻号}周期-2
+        轨道，$y$ 在两个负值间交替，但要求 $y<-2/\eta$ 即 $S=\lmax<0$，
+        与 A1 矛盾——以\emph{物理性}（数学解必须满足的现实约束，此处即
+        “最大特征值非负”）而非稳定性排除，因为命题分析的翻号
+        轨道本身就是全映射排斥子（附近轨道被推离的状态），稳定性不能作为区分两族轨道的判据。）
+  \item[(b)] \emph{条件 $y$-收缩（conditional $y$-contraction，仅在
+        “$x$ 保持在周期-2 轨道上”这一前提下成立的自发收缩：$y$ 的扰动
+        两步后乘以 $\mu_y$ 变小；它不等于轨道稳定——整体上轨道仍被
+        排斥，见 \S\ref{sec:ch09-remarks}）。}令
+        $\kappa:=2(1-\gamma)\eta^2\alpha>0$，则\emph{在 $x$ 保持周期-2
+        轨道这一条件下}的两步 $y$-方向乘子（multiplier，绕周期轨道一
+        圈后小扰动被乘的系数，$|\mu|<1$ 即扰动每圈缩小）为 $\mu_y=1-\kappa$，满足
+        $|\mu_y|<1$ 当且仅当 $(1-\gamma)\eta^2\alpha<1$。这是不变图（invariant graph，迭代映射进入后不再离开的点集——这里即
+        $x\in\{\pm x_*\}$ 两个点来回跳的集合；“图”是动力系统对“由
+        状态参数化的集合”的称呼，与神经网络计算图无关）
+        $x\in\{\pm x_*\}$ 上慢方向的收缩（收缩此处=缩小；与张量的
+        ``收缩/缩并''重名不同义），\emph{不是}轨道稳定性结果
+        （全二维映射正常排斥——完整二维映射在所有方向把附近轨道推开，
+        见 \S\ref{sec:ch09-remarks}；轨道稳定性
+        还需 G4 的高阶 $|x|$-界）。
+\end{itemize}
+\end{proposition}
+
+\textbf{证明思路（直觉版）。}(a) 是纯代数：翻号试解代入
+\eqref{eq:ch09-damped-x}、消去 $x_*$ 即得 \eqref{eq:ch09-ystar}；$y$-方程
+两步增量为零给出振幅。(b) 用慢-快/奇异摄动（slow--fast analysis / singular perturbation，系统里同时有每步剧变的快变量与每步只挪一点的慢变量时的标准分析方法：近似认为快变量瞬时到达均衡、把耦合问题拆成两个一维问题——类比把“每个 step 的高频震荡”与“几千步的缓慢漂移”分成两层）分析：$y$ 慢（每步漂移
+$O(\eta)$，即与学习率同量级的小幅度）、$x$ 快（每步翻号）。记 $m(y)=-1+2\gamma-(1-\gamma)\eta y$
+（故 $m(y^*)=-1$），扰动 $y\to y^{*}+\varepsilon$ 且 $x$ 留在快流形（快变量在慢变量暂时冻结时走出的那条轨道）：
+第一步给 $x_1=(-1-(1-\gamma)\eta\varepsilon)x_*$、$y_1=y^*+\varepsilon$
+（$y$-增量因 $|x_*|=\sqrt{2\alpha/\beta}$ 消失）；第二步用
+$x_1^2=(1+2(1-\gamma)\eta\varepsilon)x_*^2+O(\varepsilon^2)$ 与
+$\beta x_*^2=2\alpha$，得
+\begin{equation}
+  y_2 = y^{*}+\varepsilon-\underbrace{2(1-\gamma)\eta^2\alpha}_{=\,\kappa}\,\varepsilon
+  +O(\varepsilon^2)
+  = y^{*}+(1-\kappa)\,\varepsilon+O(\varepsilon^2).
+  \label{eq:ch09-contraction}
+\end{equation}
+\textbf{直觉读法}：$\kappa$ 是“恢复力对超出量的回拉增益”。$y$ 超调
+$\varepsilon$ 后，$x$-放大器先放大一点（第一步），更大的振幅产生更强的
+三次恢复力（第二步），把 $y$ 往回拉 $\kappa\varepsilon$；回拉不失控
+（$\kappa<2$，即 $|\mu_y|<1$ 的等价形式）即慢方向收缩——$\kappa<1$
+时单调回拉，$1\le\kappa<2$ 时回拉过零翻号但每圈仍在缩小。$(1-\gamma)\eta^2\alpha<1$（即 $\kappa<2$）是“阻尼不太强、
+学习率不太大、渐进尖锐化不太猛”的组合——典型 EoS 体制都安稳处于其中。
+
+\subsection{三个注记：命题\emph{不}主张什么}\label{sec:ch09-remarks}
+
+\begin{remark}[退化与不稳定不动点在范围外，转述自论文 Remark]
+$F$ 还有退化周期-1 不动点（周期-1 = 走一步即回到原处，就是不动点本身；
+``退化''指其振幅为零的平凡临界情形——与特征值的``简并''重名不同义）
+$y=-2/\eta$（$S=0$），在 EoS 体制之外。更
+值得留意的是 $(1-\gamma)\eta^2\alpha\ge1$（即 $\kappa\ge2$）时
+$|\mu_y|\ge1$，均衡连\emph{条件}稳定也失去——可能是“强阻尼 + 强渐进
+尖锐化”下最剧烈上逃逸的路径；论文实验（$\eta=0.05$、中等 $\alpha$）
+安稳处于 $\kappa<1$。
+\end{remark}
+
+\begin{remark}[体制（i）在命题前提之外，转述自论文 Remark]
+A3 把命题放进体制（ii）（精确感知）。体制（i）（滞后/自由 $\hat v$）下
+感知方向漂离 $u_1$，有效阻尼变为
+$\gamma_{\mathrm{eff}}=\gamma\cos^2\varphi$（缺口 G5）；极限
+$\hat v\perp u_1$ 时 $u_1$-振荡完全未被触碰、帽保持 $2/\eta$。体制
+（i）\emph{不是}命题的反例，而是其前提\emph{从未生效}的体制——迭代点
+默认坐在无阻尼均衡 $y^{*}=0$ 上。
+\end{remark}
+
+\begin{remark}[全二维 Jacobian：命题只主张条件 $y$-收缩，转述自论文 Remark]
+$DF^2$（映射 $F$ 复合两步后的一阶导数矩阵，即 Jacobian——小扰动每步
+被如何放大/旋转的局部线性近似；特征值的模 $>1$ 表示扰动被放大）在 $(x_*,y_*)$ 处特征值为 $(1-\kappa)\pm2i\sqrt{\kappa}$（一对共轭
+复特征值——小扰动可以``边转边缩''，旋转分量在数学上记成虚部 $i$；
+``模'' = $\sqrt{\text{实部}^2+\text{虚部}^2}$，即总的放大倍数）、模
+$1+\kappa>1$：全二维映射\emph{正常排斥}（在所有方向上把附近轨道推开
+——但真实轨迹仍可在排斥轨道\emph{附近}贴着走，所以理论不稳定不等于
+实验上看不见）。命题 (b) 只主张\emph{条件}
+$y$-方向乘数（不变图 $x\in\{\pm x_*\}$ 上、$x$ 被役使——役使即快变量
+被慢变量锁死、只能瞬时跟随而无独立动力学），不主张渐近
+稳定性（渐近稳定 = 从附近出发的轨迹最终都收敛到该状态）。标准 EoS 直觉——快方向 $x$ 的放大充当“幅度伺服”（amplitude servo，伺服即
+“持续把某个量拉回目标值”的闭环（闭环 = 边测边调、测量结果反馈进
+下一步决策的回路）装置，恒温器是最常见的例子；此处指
+振荡幅度自动充当恒温器：$y$ 超调
+$\to|x|$ 增长 $\to$ 恢复力 $\beta x^2/2$ 压过渐进尖锐化 $\alpha$ $\to$
+$y$ 被压回）——是缺口 G4 的\emph{猜想式}闭合：给 $|x_\infty|$ 定界需要
+二维约化丢掉的四次及更高阶项。关键：负主张 (a) \emph{完全不依赖}这套
+稳定性叙事，它是试解上的纯代数。
+\end{remark}
+
+\subsection{推论（转述）：向上逃逸只定方向；与 bulk 投影的会合}\label{sec:ch09-upward}
+
+\begin{corollary}[向上逃逸，仅方向；转述自论文 Corollary]
+均衡 $S^{*}=2/\eta+y^{*}=2d/\eta$（$d=1/(1-\gamma)$）；$\gamma\uparrow1$
+驱动 $S^{*}\to\infty$。命题钉住\emph{方向}（$y^{*}>0$，向上）与参数
+依赖（$S^{*}=2d/\eta$），但不钉住 $S$ 收敛到的有限值——那由无阻碍
+渐进尖锐化在哪里平衡决定，超出二维约化的视野。
+\end{corollary}
+
+这使论文与 Song 等人 (2025) 接上头：他们把 SGD 更新投影到谱“bulk”
+（去掉 top-$k$ 特征向量分量），报告尖锐度无约束增长而 loss 与精度保持。
+在本文的视角下这正是 $\gamma\to1$（$d\to\infty$）极限：均衡 $S^{*}=2d/\eta$
+随 $d\to\infty$ 发散，他们的“无约束增长”就是\emph{均衡本身的发散}。
+“伪对齐”与“帽移除”两种解读描述的是同一条轨迹；只有后者定量预测 $\gamma$
+依赖的发散。部分阻尼（$\gamma<1$）实验在有限 $S^{*}$ 处诊断帽；全投影
+（$\gamma=1$）把它整个移除。
+
+\begin{remark}[可分离多特征值扩展，转述自论文 Remark]
+若 $H$ 可分离（$H=\sum_i\lambda_iu_iu_i^{\!\top}$、无非对角耦合——注意
+谱分解这一步任何对称矩阵都有（海森天然对称：混合二阶偏导相等
+$\partial^2L/\partial\theta_i\partial\theta_j=
+\partial^2L/\partial\theta_j\partial\theta_i$），所以对海森永远合法；
+``可分''额外限制的是\emph{高阶}交叉项为零：
+动一个特征方向不会改变另一个方向的曲率，各方向动力学因此独立），
+Damian 递推解耦为独立 $(x_i,y_i)$ 对，命题\emph{逐方向}成立：每个未
+阻尼方向的帽留在 $y_i^{*}=0$、每个被阻尼方向移到 $y_i^{*}>0$。论文的
+多尖锐景观测试在\emph{不可分}景观上实证确认了这种逐方向独立性——
+Damian 等人 (2023) 留开放的情形——部分闭合缺口 G1。（按轨迹 PCA，第一
+主成分解释 MLP/ResNet/ViT/ConvNeXt 轨迹方差的 84--99\%：一维尖锐几何
+才是 EoS 的典型体制，多尖锐构造是诊断工具而非默认情形。）
+\end{remark}
+
+\subsection{推论（转述）：SAM 如何到达下逃逸区}\label{sec:ch09-sam}
+
+\begin{corollary}[SAM 经曲率放大动作到达 $y<0$；转述自论文 Corollary]
+SAM 的更新
+$\theta_{t+1}=\theta_t-\eta\nabla L(\theta_t+\rho\nabla L/\|\nabla L\|)$
+\emph{不进入}秩-1 递推 \eqref{eq:ch09-damped-x}：展开到 $O(\rho)$
+（Andriushchenko 等人，2022），有效梯度
+$\nabla L^{\mathrm{SAM}}\approx(I+\tfrac{\rho}{\|g\|}H)g$，把顶部方向
+重缩放为 $1+\rho\lambda_1/\|g\|>1$（曲率\emph{放大}），从而把 SAM
+追踪的稳定性边界降到
+\begin{equation}
+  \lambda^{*}_{\mathrm{SAM}}
+  =\frac{\|g\|}{2\rho}\!\left(\sqrt{1+\tfrac{8\rho}{\eta\|g\|}}-1\right)
+  <\frac{2}{\eta},
+  \label{eq:ch09-sam-boundary}
+\end{equation}
+即 $y^{*}_{\mathrm{SAM}}<0$（Long 等人，2024）。秩-1 阻尼把顶部方向缩为
+$1/d<1$（曲率\emph{衰减}），把边界抬到 $y^{*}>0$。这就是“全局动作
+必要”的形式内容：只有曲率放大型（全方向）扰动到达下逃逸区；任何固定
+预测方向上的秩-1 执行器都不能。
+\end{corollary}
+
+直觉：SAM 的扰动 $\rho g/\|g\|$ 一阶贡献 $(\rho/\|g\|)Hg$——沿 $g$
+已有的分量按曲率加权加回去，顶部方向（曲率最大、且 EoS 对齐区里 $g$
+本就偏向 $u_1$）被放得最猛：尖锐轴上有效步长变大，等价于 SAM 的稳定
+运行点落在更低的尖锐度处。秩-1 阻尼是照镜子：同样的代数、符号相反
+（第~\ref{sec:ch08}~章的 SAM $22.63\pm1.73$ vs rank-1 $28.83\pm1.67$
+是规模版回声）。
+
+\subsection{推论与观察（转述）：正交阻尼留帽；滞后无害}\label{sec:ch09-orth-lag}
+
+\begin{corollary}[正交阻尼留帽；转述自论文 Corollary]
+C4 执行器 $\Delta\theta=-\eta(g_{\parallel}+g_{\perp}/d)$（
+$g_{\parallel}=(g^{\!\top}u_1)u_1$）\emph{保留}沿 $u_1$ 的梯度分量，其
+$x$-递推因此就是无阻尼 Damian 映射 $x_{t+1}=-(1+\eta y_t)x_t$，周期-2
+不动点 $y^{*}=0$：正交阻尼只重缩放补空间、不进入顶部方向动力学，对每个
+$d$ 帽都保持 $2/\eta$。渐进尖锐化供给 $\alpha=-\nabla L\cdot\nabla S$
+\emph{不}被重标（C4 保留 $g_{\parallel}$），误用
+$y_{t+1}=y_t+\eta(\alpha/d-\beta x^2/2)$ 这类 ansatz 会把阻尼错误归因；
+大 $d$ 时逐种子方差变宽是缺口 G4 的实测。
+\end{corollary}
+
+方法论教训：写错状态变量的 ansatz 也能解出“貌似合理”的均衡，把你引向
+\emph{错误的机制归因}——推导必须逐项核对每个递推保留了一阶信息中的
+哪些。
+
+\begin{observation}[滞后无害；梯度方向探针钉住；转述自论文 Observation]
+延迟更新传感器 $\hat v_k=\Delta\theta_{t-k}/\|\cdot\|$ 混淆两种缺陷——
+\emph{滞后}，与使用更新（梯度）方向而非特征向量方向。分开后只有第二种
+导致钉住：滞后\emph{但精确}的 $\hat v_k=\hat u(t-k)$ 留在体制（ii），
+因为 $u_1$ 在慢的 $O(1/\eta)$ 时间尺度上旋转（Damian 等人，2023），
+$\hat u(t-k)\approx u_1(t)$（只测短滞后 $k\le3$）。滞后的更新方向传感器
+$\hat v_k=\Delta\theta_{t-k}\propto-g$ 则遭遇\emph{自致}感知失败：plant
+自己的阻尼旋转更新方向 $\to$ 滞后 $\hat v$ 漂离 $u_1$ $\to$ 瑞利商崩塌
+$\to$ 自门控钳位使 $\gamma=0$ $\to$ 退化为无阻尼 Damian GD、$y^{*}=0$。
+起作用的是\emph{方向不精确}，不是\emph{数据陈旧}。
+\end{observation}
+
+帽对感知\emph{滞后}稳健、对感知\emph{不精确}不稳健：只有精确的顶部
+方向感知才能实现帽移除（若无自门控钳位，陈旧瑞利商会翻转 $\gamma<0$、
+反阻尼至发散——那是执行器病理，不是帽移除）。这把教程“必须用单步
+$\Delta\theta$ 测对齐”的陷阱升级成执行器设计忠告：拿更新方向当传感器，
+控制器会亲手毁掉自己的传感器。
+
+\subsection{缺口清单 G1--G5：从二维定理到轨迹定理}\label{sec:ch09-gaps}
+
+\begin{itemize}
+  \item \textbf{G1（多特征值解耦）}。Damian 等人 (2023) 留给后续工作
+        （其 \S8.2）的多特征值扩展仍开放；可分离情形已解
+        （\S\ref{sec:ch09-upward} 注记），不可分情形有实证支持（多尖锐
+        谱逐方向独立钉住）但无证明。
+  \item \textbf{G2（旋转奇点）}。A1 在特征值交叉
+        $\lambda_1\leftrightarrow\lambda_{j^*}$ 处失效（第二大特征值
+        追平并反超最大值时，“哪个方向最尖”瞬间易主，尖锐度函数出现
+        角点），$\nabla S$ 奇异（此处“奇异”指梯度无定义/爆炸，不是
+        矩阵不可逆之义）；
+        补丁开放（实证上轨迹以 $O(\eta^{-1})$ 步穿过交叉、定性结论
+        保持）。
+  \item \textbf{G3（时变 $\gamma$）}。扩展到分段常数 $\gamma_t$（刷新
+        间隔 $N$）需扰动分析（perturbation analysis，把“每 $N$ 步才
+        刷新一次”视为对理想连续情形的小偏差、用级数展开逐阶算出影响
+        的数学方法，与 SAM 给参数加“扰动”无关）——这正是实际 plant 的运行方式（ResNet-18
+        上每 $N=20$ 步刷新感知）。
+  \item \textbf{G4（高阶 $|x|$-界）}。快方向放大需四次及更高阶景观项
+        定界，二维约化没有它们；“幅度伺服”闭合仍是猜想。
+  \item \textbf{G5（感知误差）}。$\hat v$ 与 $u_1$ 成角 $\varphi$ 时
+        有效阻尼 $\gamma_{\mathrm{eff}}=\gamma\cos^2\varphi$，命题以
+        $\gamma\to\gamma_{\mathrm{eff}}$ 保持。
+\end{itemize}
+
+清单之外，论文对框架隐喻也保持诚实：观测器-控制器分离原理
+（observer--controller separation principle）在线性控制论里是精确的
+定理，而这里的对象是非线性、非凸、（在规模实验里）随机且带动量的
+动力学——连阈值本身都会移（全批 GD 的 $2/\eta$、重球的 $2(1+\mu)/\eta$、
+随机 EoS 的批尖锐度阈值），所以控制端主张是\emph{机制猜想 + 二维约化
+定理 + 三个控制实验}，不是轨迹定理。机制也依体制而变：全批 MLP 体制是
+“帽移除”（上逃逸），规模体制是“重分布”（有动作仍被钉住，
+第~\ref{sec:ch08}~章）——但判决共享：\emph{没有局部动作能把 $\lmax$ 压
+到均衡之下}。
+
+\subsection{与教程的衔接}\label{sec:ch09-tutorial}
+
+教程第 7 节给了自稳定化的“定性故事”（三阶泰勒项阻尼、对齐签名
+$|\cos(\Delta\theta,\vtope)|\to0.998$、单步 $\Delta\theta$ 的
+测量陷阱）；本章给出它的“定量骨架”与执行器碰上骨架时的全部结局——
+滞后感知留帽、精确阻尼搬帽向上、正交阻尼不碰帽、全局曲率放大把边界压
+到 $2/\eta$ 之下。教程教你\emph{看懂} EoS；本章告诉你这个被看懂的机构
+里，哪些零件动得、哪些动不得。
+
+\subsection*{本章要点}
+\begin{itemize}
+  \item $2/\eta$ 是周期-2 振荡自洽维持的\emph{自稳定帽}：渐进尖锐化
+        $\alpha$ 与三次恢复力 $\tfrac{\beta}{2}x^2$ 的预算平衡钉住
+        $S\approx2/\eta$——帽就是振荡本身。
+  \item 秩-1 阻尼的均衡超出量 $y^{*}=2\gamma/((1-\gamma)\eta)>0$ 且随
+        $\gamma$ 单调升：阻尼搬走帽的高度（向上），不是振幅；自门控下
+        不动点条件化为恒等式——理论只定方向，量级归景观。
+  \item 命题（转述自论文 Proposition 1）：无翻号周期-2 轨道
+        $y^{*}\le0$（纯代数）；条件 $y$-收缩 $\mu_y=1-\kappa$ 只在
+        $(1-\gamma)\eta^2\alpha<1$ 下成立——全二维映射正常排斥，命题
+        不主张轨道稳定性。
+  \item 两条推论合拢“全局动作必要”：SAM 曲率放大把边界压到
+        $\lambda^{*}_{\mathrm{SAM}}<2/\eta$；秩-1 曲率衰减只能抬边界；
+        正交阻尼与滞后感知都留帽。G1--G5 在案：二维约化定理 + 机制
+        猜想，不是轨迹定理——诚实盘点边界。
+\end{itemize}

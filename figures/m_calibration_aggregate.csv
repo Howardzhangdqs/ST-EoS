@@ -1,0 +1,5 @@
+kind,m,n_runs,lam_hat_pooled,lam_hat_cross_run_sd,se_of_mean,sd_sub_mean,sd_disjoint_mean,sd_theory,scan_value_mean,scan_vs_pool_z_mean,scan_vs_pool_z_maxabs,note
+subsampling,4,3,24.6764,1.57187,0.403822,3.90664,3.62838,3.8942,23.1055,-0.32143,1.19976,
+subsampling,16,3,24.6764,1.57187,0.403822,1.94137,1.69446,1.9471,24.3958,-0.000494713,1.14501,
+verdict,4,3,24.6764,1.57187,,,,4.36305,20.8906,-1.19976,,center z=+0.0000 (|z|<<1: subsample means centered on λ̂_128 by construction of the partition); group-z mean +0.000 (bias would show as mean_z<0 with |mean_z|>2/√n_groups); earlier m-scan value 20.89 sits at z=-1.20 of the m=4 sampling distribution (sd σ̂/√m=4.36)
+verdict,16,3,24.6764,1.57187,,,,2.18152,23.9051,-1.0177,,center z=-0.0000 (|z|<<1: subsample means centered on λ̂_128 by construction of the partition); group-z mean +0.000 (bias would show as mean_z<0 with |mean_z|>2/√n_groups); earlier m-scan value 23.91 sits at z=-1.02 of the m=16 sampling distribution (sd σ̂/√m=2.18)

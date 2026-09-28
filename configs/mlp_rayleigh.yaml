@@ -1,0 +1,45 @@
+# Candidate-1 equivalence check (Candidate 1 — Δθ/g Rayleigh proxies).
+# For plain full-batch GD Δθ = −ηg, so λ̂_Δθ ≡ λ̂_g ≡ λ_c algebraically — this
+# run exists to confirm that identity and to provide the cheap MLP LR-sweep echo
+# of the regime-transition (Finding-5/8 universality style). The HEADLINE is the
+# CIFAR-momentum run (scripts/train_cifar_resnet.py), where Δθ ≠ −ηg.
+run_name: mlp_rayleigh
+seed: 0
+device: cuda
+
+model:
+  name: mlp
+  in_dim: 20
+  hidden_dims: [256, 256]
+  out_dim: 1
+  activation: tanh
+  layer_norm: false
+
+data:
+  name: teacher_student
+  n: 1024
+  dim: 20
+  difficulty: 0.3
+  teacher_hidden: [128, 128]
+
+optimizer:
+  type: sgd
+  lr: 0.05
+  momentum: 0.0
+  weight_decay: 0.0
+
+train:
+  steps: 3000
+  batch_size: full
+
+monitor:
+  snapshot_every: 50
+  log_every: 500
+
+sharpness:
+  enabled: true
+  every: 50
+  kinds: [lambda_max, rayleigh]   # rayleigh adds λ̂_grad, λ̂_update, cos_*_vtop
+  n_iter: 150
+  tol: 0.0001
+  warm_start_vec: true

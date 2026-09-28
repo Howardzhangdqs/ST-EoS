@@ -1,0 +1,12 @@
+Actuation strength = per-step realized relative edit ||g'-g||/||g|| (exact from plant logs: sqrt(sum_i (dampings_i*cos_i)^2), V orthonormal).
+1. rank-20 damping (k=20): 0.0615 on fired steps (0.0575 over ALL steps) — the LARGEST plant edit in the sweep.
+2. linSAM linear correction (taylor_d_lin, late window): nan — nanx the rank-20 realized edit.
+3. SAM full perturbed-gradient displacement (taylor_d_total, late): nan.
+HEADLINE: the rank-kx plants actuate far more weakly per step than linSAM/SAM already corrects (rank-20 0.0615 vs linSAM nan), yet only SAM moves batch sharpness — actuation strength alone does not separate the arms.
+4. rank-20 amplification (α=1.0, k=20): 0.0805 realized edit every step (unconditional).
+5. Damping edits are gated by the self-sensing divisor (fired fraction per arm in the CSV); amplify fires every step by construction.
+6. angle(g',g) on fired steps is reported in the CSV (exact arccos algebra — no small-edit approximation was needed).
+7. Semantics: damp d_i=lambda_i/lambda_targ raw (no max floor), f_i=clip(1-1/d_i,-1,1); amplify f=-alpha (alpha from manifest).
+8. linSAM/SAM magnitudes from metrics.csv taylor columns (measured every 200 steps on the current train minibatch, train-mode BN).
+9. Late-window convention: step >= 2000 (matches analyze_bsharp_arms.py); plant stats use all 5000 steps per seed.
+10. Caveat: plant rel-edit is per TRAIN step (all steps); taylor magnitudes are every-200-step probes — same order-of-magnitude comparison, not identical sampling.

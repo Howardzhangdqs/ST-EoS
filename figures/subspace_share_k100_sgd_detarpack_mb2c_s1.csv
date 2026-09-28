@@ -1,0 +1,8 @@
+run,kind,k,m,n_batches,mean,se,note
+cifar100_r18_sgd_detarpack_mb2c_s1,arpack,100.0,,1,15.709452629089355,,lam1=15.7095 lam2=14.8353 lam_k=1.1575 ritz_top=1.73e-04 tol=0.0001 ncv=132 t_min=8.6
+cifar100_r18_sgd_detarpack_mb2c_s1,share_s_k,20.0,64.0,64,0.1282522800611332,0.0063466369045295295,cumulative minibatch-grad energy share E_B[sum_(i<=k)(g_B.v_i)^2/||g_B||^2]
+cifar100_r18_sgd_detarpack_mb2c_s1,share_s_k,50.0,64.0,64,0.18910363677423447,0.006596900619014815,cumulative minibatch-grad energy share E_B[sum_(i<=k)(g_B.v_i)^2/||g_B||^2]
+cifar100_r18_sgd_detarpack_mb2c_s1,share_s_k,100.0,64.0,64,0.2387239544186741,0.006799780713890883,cumulative minibatch-grad energy share E_B[sum_(i<=k)(g_B.v_i)^2/||g_B||^2]
+cifar100_r18_sgd_detarpack_mb2c_s1,lhg_m,,4.0,4,24.425147720444695,2.4273354177794038,batch sharpness gHg/gg at m minibatches (nested first-m of the draws)
+cifar100_r18_sgd_detarpack_mb2c_s1,lhg_m,,16.0,16,24.614307522066163,1.615702917868917,batch sharpness gHg/gg at m minibatches (nested first-m of the draws)
+cifar100_r18_sgd_detarpack_mb2c_s1,lhg_m,,64.0,64,24.55996556200465,0.9823893779698291,batch sharpness gHg/gg at m minibatches (nested first-m of the draws)

@@ -1,0 +1,2 @@
+arm,n,mean_diff,ci_lo,ci_hi,margin,equivalent,verdict
+rankkx_d1,5,1.598757291153858,-1.8892431875587574,5.086757769866473,1.3957375937386556,False,NOT established (CI exits margin)

@@ -1,0 +1,40 @@
+# Milestone-0: MLP on teacher-student regression, full-batch GD, full monitoring.
+# Goal of this run: confirm the harness trains (loss decreases) and records
+# per-step metrics + weight snapshots. EoS reproduction (lambda_max -> 2/eta)
+# is validated in Phase 2 once the sharpness module is wired in.
+run_name: mlp_ts_default
+seed: 0
+device: cuda
+
+model:
+  name: mlp
+  in_dim: 20
+  hidden_dims: [256, 256]
+  out_dim: 1
+  activation: tanh
+  layer_norm: false
+
+data:
+  name: teacher_student
+  n: 1024
+  dim: 20
+  difficulty: 0.3
+  teacher_hidden: [128, 128]
+
+optimizer:
+  type: sgd
+  lr: 0.05
+  momentum: 0.0
+  weight_decay: 0.0
+
+train:
+  steps: 3000
+  batch_size: full
+
+monitor:
+  snapshot_every: 10
+  log_every: 200
+
+sharpness:
+  enabled: false
+  every: 0

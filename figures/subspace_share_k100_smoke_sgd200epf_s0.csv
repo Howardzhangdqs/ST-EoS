@@ -1,0 +1,5 @@
+run,kind,k,m,n_batches,mean,se,note
+cifar100_r18_sgd_200epf_s0,arpack,20.0,,1,1.323697566986084,,lam1=1.3237 lam2=1.0521 lam_k=0.3555 ritz_top=2.16e-04 tol=0.0001 ncv=None t_min=1.0
+cifar100_r18_sgd_200epf_s0,share_s_k,20.0,16.0,16,0.13819655636325479,0.011238729687767686,cumulative minibatch-grad energy share E_B[sum_(i<=k)(g_B.v_i)^2/||g_B||^2]
+cifar100_r18_sgd_200epf_s0,lhg_m,,4.0,4,2.1774129772238773,0.49203874609417914,batch sharpness gHg/gg at m minibatches (nested first-m of the draws)
+cifar100_r18_sgd_200epf_s0,lhg_m,,16.0,16,5.101699397669005,1.4814138984264849,batch sharpness gHg/gg at m minibatches (nested first-m of the draws)
